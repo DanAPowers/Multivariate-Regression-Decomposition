@@ -16,6 +16,6 @@ The following models are supported:
     decomp.probit      (probit regression decomposition)
     decomp.cloglog     (complementary log-log regression decomposition)
     decomp.poisson     (poisson regression decomposition)
-    decomp.negbin      (negative binomuial regression decomposition)
+    decomp.negbin      (negative binomial regression decomposition)
 
 The example file mvdecompExample.R provides more detail using data from the NHANES.
