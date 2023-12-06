@@ -1,7 +1,7 @@
 # mvdecompExample.R
 
-setwd('~/documents/R_progs/mvdecomp')
-source('~/documents/R_progs/mvdecomp/svydecomp_functions.R')
+setwd('~/')
+source('svydecomp_functions.R')
 
 # libraries
 require(survey)    # all models
