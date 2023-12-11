@@ -77,8 +77,8 @@ m4 <- decomp.probit(highbp ~ age + BMI + rural + female, Asub, Bsub,
 m5 <- decomp.cloglog(highbp ~ age + BMI + rural + female, Asub, Bsub, 
                     scale=10, printit=TRUE)
 
-#
 # linear
+# 
 # make subsets etc. (female/male)
 Asub <- subset(nhsvy, female == 1)
 Bsub <- subset(nhsvy, female == 0)
@@ -196,7 +196,6 @@ tot.decompC <- function(D1,D2,scale) {
   v2 <- D2$varC
    C <- s * (C1 - C2)/2
    V <- (v1^2 + v2^2)/4
-   c
 seC  <- sqrt(V)*s
 return(data.frame(term=vn, b=C,se=seC, z=C/seC,
                   b.lower=C - 1.96*seC,
