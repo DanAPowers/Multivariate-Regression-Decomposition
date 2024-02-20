@@ -1,13 +1,30 @@
+#########################################################################
+# Author: Dan Powers (11/22/23)
+# functions for multivariate regression decomposition
+# of difference in first moments--E[F(XB)]--between group a and group b: 
+#
+#  D = E[F(XaBa)] - E[F(XbBb)] 
+#    = {E[F(XaBa)]  - E[F(XbBa)]} + {E[F(XbBa)] - E[F(XbBb)]|
+# 
+#  X <- characteristics (observed)
+#  B <- effects         (estimated)
+# 
+# use svyglm for linear and nonlinear regression models
+# compare to Stata -mvdcmp-
+########################################################################
+
+
 ##################################
 # model_setup_svy.R
 ##################################
 require(survey)
+###############
 mod.out <- function(m, sub) {
   b   <- coef(m)
   x   <- m$x
   v   <- m$cov.unscaled
-  sub   <- sub
-  w     <- weights(sub)
+  sub <- sub
+  w   <- weights(sub)
   mget(ls())
 } 
 
@@ -164,7 +181,7 @@ decomp_logit <- function(A,B, scale=NULL, printit)  {
   }
   
   decomp_svybinary(bA, bB, xA, xB, varbA, varbB, 
-                   mA, mB, Asub, Bsub, printit, scale, eval(F), eval(f))
+                    mA, mB, Asub, Bsub, printit, scale, F, f)
 }
 
 ################################
@@ -207,7 +224,7 @@ decomp_probit <- function(A,B,scale=NULL, printit)  {
   
   decomp_svybinary(bA, bB, xA, xB, varbA, varbB, 
                    mA, mB, Asub, Bsub, printit, scale, 
-                   eval(F), eval(f))
+                   F, f)
 }
 
 ################################
@@ -251,7 +268,7 @@ decomp_cloglog <- function(A,B, scale=NULL, printit)  {
   
   decomp_svybinary(bA, bB, xA, xB, varbA, varbB, 
                    mA, mB, Asub, Bsub, printit, scale, 
-                   eval(F), eval(f))
+                   F, f)
 }
 
 ###############################
@@ -305,7 +322,7 @@ decomp_poisson <- function(A, B, scale=NULL, printit=FALSE)  {
   }
   
   decomp_svycount(bA, bB, xA, xB, varbA, varbB, offA, offB, mxpA, mxpB,
-                  mA, mB, Asub, Bsub, printit, scale, eval(F), eval(f))
+                  mA, mB, Asub, Bsub, printit, scale, F, f)
 }
 
 
@@ -352,7 +369,7 @@ decomp_linear <- function(A,B,scale=NULL, printit)  {
   
   decomp_svylinear(bA, bB, xA, xB, varbA, varbB, 
                    mA, mB, Asub, Bsub, wA, wB, printit, scale, 
-                   eval(F), eval(f))
+                   F, f)
 }
 
 
@@ -363,9 +380,6 @@ decomp_linear <- function(A,B,scale=NULL, printit)  {
 ###########################################################
 decomp_svybinary <- function(bA, bB, xA, xB, varbA, varbB, 
                    mA, mB, Asub, Bsub, printit, scale, F, f) {
-  
-  F <- eval(F)
-  f <- eval(f)
   
 Wdx.F  <- function(b,x1,x2) {
   # Yun weight function (E composition) 
@@ -522,6 +536,7 @@ if (is.null(v.names)) {
 ymA <- svymean(~F(bA, xA), Asub) * scale
 ymB <- svymean(~F(bB, xB), Bsub) * scale
 
+
 if (printit==TRUE) {
   
   cat("","\n")
@@ -570,12 +585,17 @@ if (printit==TRUE) {
   cat("","\n")
   cat("          Variable  ", " Estimate",   "  Std. Error",  "  Z-Val",  "        PCT",  "\n")
   cat("___________________________________________________________________", "\n")
-  for (i in 2:length(bA)){
+  
+  idx <- grepl("(Intercept)", v.names)
+  
+  for (i in 1:length(bA)){
+    if (!idx[i]) {
     cat(formatC(v.names[i],format="s", wid=20),
-        formatC(E*Wdx[i]*scale,       flag=" ", dig=7, wid=10, format="f"),
-        formatC(seWdx[i]*scale,       flag=" ", dig=7, wid=10, format="f"),
+        formatC(E*Wdx[i]*scale,       flag=" ", dig=4, wid=10, format="f"),
+        formatC(seWdx[i]*scale,       flag=" ", dig=4, wid=10, format="f"),
         formatC(E*Wdx[i]/seWdx[i],    flag=" ", dig=4, wid=10, format="f"),
         formatC(100*(E*Wdx[i]/(E+C)), flag="+", dig=1, wid=10, format="f"), "\n")
+    }
   }
   cat("","\n")
   cat("DUE TO DIFFERENCE IN COEFFICIENTS (C)", "\n")
@@ -584,16 +604,16 @@ if (printit==TRUE) {
   cat("___________________________________________________________________", "\n")
   for (i in 1:length(bA)){
     cat(formatC(v.names[i],format="s", wid=20),
-        formatC(C*Wdb[i]*scale,       flag=" ",  dig=7, wid=10, format="f"),
-        formatC(seWdb[i]*scale,       flag=" ",  dig=7, wid=10, format="f"),
+        formatC(C*Wdb[i]*scale,       flag=" ",  dig=4, wid=10, format="f"),
+        formatC(seWdb[i]*scale,       flag=" ",  dig=4, wid=10, format="f"),
         formatC(C*Wdb[i]/seWdb[i],    flag=" ",  dig=4, wid=10, format="f"), 
         formatC(100*(C*Wdb[i]/(E+C)), flag="+",  dig=1, wid=10, format="f"),"\n")
     
   }
 } # end printit
 
+# collect things to return
 K        <- length(bA)
-# store these
 bE       <- matrix(E*Wdx,K,1) 
 varbE    <- matrix(Var.E.k,K,K)
 bC       <- matrix(C*Wdb,K,1)
@@ -607,11 +627,19 @@ rownames(bC) <- v.names
 colnames(varbE) <- rownames(varbE) <- v.names
 colnames(varbC) <- rownames(varbC) <- v.names
 
-# returns 
-return(list(vnames=v.names, E=E, varE=varE, 
-            C=C, varC=varC,
-            bE=bE, varbE=varbE, 
-            bC=bC, varbC=varbC))
+# returns to model object
+return(list( vnames=v.names, 
+             scale=scale,
+             coefE=bE, 
+             vcovE=varbE, 
+             coefC=bC, 
+             vcovC=varbC,
+             E=E,
+             C=C,    
+             varE=varE,
+             varC=varC )
+       )
+
 
 }  # end decomp_svybinary
 
@@ -623,9 +651,6 @@ return(list(vnames=v.names, E=E, varE=varE,
 #
 decomp_svycount <- function(bA, bB, xA, xB, varbA, varbB, offA, offB, mxpA, mxpB,
                             mA, mB, Asub, Bsub, printit, scale, F, f) {
-  
-  F <- eval(F)
-  f <- eval(f)
   
   Wdx.F  <- function(b,x1,x2) {
     # Yun weight function (E composition) 
@@ -832,13 +857,19 @@ decomp_svycount <- function(bA, bB, xA, xB, varbA, varbB, offA, offB, mxpA, mxpB
     cat("","\n")
     cat("          Variable  ", " Estimate",   "  Std. Error",  "  Z-Val",  "        PCT",  "\n")
     cat("___________________________________________________________________", "\n")
-    for (i in 2:length(bA)){
-      cat(formatC(v.names[i],format="s", wid=20),
-          formatC(E*Wdx[i]*scale,       flag=" ", dig=7, wid=10, format="f"),
-          formatC(seWdx[i]*scale,       flag=" ", dig=7, wid=10, format="f"),
-          formatC(E*Wdx[i]/seWdx[i],    flag=" ", dig=4, wid=10, format="f"),
-          formatC(100*(E*Wdx[i]/(E+C)), flag="+", dig=1, wid=10, format="f"), "\n")
+    
+    idx <- grepl("(Intercept)", v.names)
+    
+    for (i in 1:length(bA)){
+      if (!idx[i]) {
+        cat(formatC(v.names[i],format="s", wid=20),
+            formatC(E*Wdx[i]*scale,       flag=" ", dig=4, wid=10, format="f"),
+            formatC(seWdx[i]*scale,       flag=" ", dig=4, wid=10, format="f"),
+            formatC(E*Wdx[i]/seWdx[i],    flag=" ", dig=4, wid=10, format="f"),
+            formatC(100*(E*Wdx[i]/(E+C)), flag="+", dig=1, wid=10, format="f"), "\n")
+      }
     }
+    
     cat("","\n")
     cat("DUE TO DIFFERENCE IN COEFFICIENTS (C)", "\n")
     cat("","\n")
@@ -846,8 +877,8 @@ decomp_svycount <- function(bA, bB, xA, xB, varbA, varbB, offA, offB, mxpA, mxpB
     cat("___________________________________________________________________", "\n")
     for (i in 1:length(bA)){
       cat(formatC(v.names[i],format="s", wid=20),
-          formatC(C*Wdb[i]*scale,       flag=" ",  dig=7, wid=10, format="f"),
-          formatC(seWdb[i]*scale,       flag=" ",  dig=7, wid=10, format="f"),
+          formatC(C*Wdb[i]*scale,       flag=" ",  dig=4, wid=10, format="f"),
+          formatC(seWdb[i]*scale,       flag=" ",  dig=4, wid=10, format="f"),
           formatC(C*Wdb[i]/seWdb[i],    flag=" ",  dig=4, wid=10, format="f"), 
           formatC(100*(C*Wdb[i]/(E+C)), flag="+",  dig=1, wid=10, format="f"),"\n")
       
@@ -885,9 +916,6 @@ decomp_svylinear <- function(bA, bB, xA, xB, varbA, varbB,
                              mA, mB, Asub, Bsub, wA, wB, printit, scale, F, f) {
   
 
-  F <- eval(F)
-  f <- eval(f)
-  
   Wdx.F  <- function(b,x1,x2) {
     # Yun weight function (E composition) 
     # b      = coef
@@ -1103,13 +1131,19 @@ decomp_svylinear <- function(bA, bB, xA, xB, varbA, varbB,
     cat("","\n")
     cat("          Variable  ", " Estimate",   "  Std. Error",  "  Z-Val",  "        PCT",  "\n")
     cat("___________________________________________________________________", "\n")
-    for (i in 2:length(bA)){
-      cat(formatC(v.names[i],format="s", wid=20),
-          formatC(E*Wdx[i]*scale,       flag=" ", dig=7, wid=10, format="f"),
-          formatC(seWdx[i]*scale,       flag=" ", dig=7, wid=10, format="f"),
-          formatC(E*Wdx[i]/seWdx[i],    flag=" ", dig=4, wid=10, format="f"),
-          formatC(100*(E*Wdx[i]/(E+C)), flag="+", dig=1, wid=10, format="f"), "\n")
+    
+    idx <- grepl("(Intercept)", v.names)
+    
+    for (i in 1:length(bA)){
+      if (!idx[i]) {
+        cat(formatC(v.names[i],format="s", wid=20),
+            formatC(E*Wdx[i]*scale,       flag=" ", dig=4, wid=10, format="f"),
+            formatC(seWdx[i]*scale,       flag=" ", dig=4, wid=10, format="f"),
+            formatC(E*Wdx[i]/seWdx[i],    flag=" ", dig=4, wid=10, format="f"),
+            formatC(100*(E*Wdx[i]/(E+C)), flag="+", dig=1, wid=10, format="f"), "\n")
+      }
     }
+    
     cat("","\n")
     cat("DUE TO DIFFERENCE IN COEFFICIENTS (C)", "\n")
     cat("","\n")
@@ -1117,8 +1151,8 @@ decomp_svylinear <- function(bA, bB, xA, xB, varbA, varbB,
     cat("___________________________________________________________________", "\n")
     for (i in 1:length(bA)){
       cat(formatC(v.names[i],format="s", wid=20),
-          formatC(C*Wdb[i]*scale,       flag=" ",  dig=7, wid=10, format="f"),
-          formatC(seWdb[i]*scale,       flag=" ",  dig=7, wid=10, format="f"),
+          formatC(C*Wdb[i]*scale,       flag=" ",  dig=4, wid=10, format="f"),
+          formatC(seWdb[i]*scale,       flag=" ",  dig=4, wid=10, format="f"),
           formatC(C*Wdb[i]/seWdb[i],    flag=" ",  dig=4, wid=10, format="f"), 
           formatC(100*(C*Wdb[i]/(E+C)), flag="+",  dig=1, wid=10, format="f"),"\n")
       
